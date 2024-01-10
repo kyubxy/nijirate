@@ -56,6 +56,30 @@ class TranslateMode(Mode):
             c.y = my - oy
 
 
+class ScaleMode(Mode):
+    def __init__(self, state:State):
+        self._state: State = state
+        self.initrect = None
+
+    # TODO: use the selected list directly when implementing multiscale
+    def __get_one(self):
+        return self._state.get_selected()[0]
+
+    def mousepressed(self, pos):
+        one = self.__get_one()
+        self.initrect = pygame.Rect(one.x, one.y, one.w, one.y)
+
+    def mousemotion(self, initpos, pos):
+        if self.initrect is None:
+            return  # malformed state - seeya later!
+        mx, my = pos
+        #ox, oy = (initpos[0] - self.initrect.right, initpos[1] - self.initrect.bottom)
+        ox, oy = self.initrect.right, self.initrect.bottom
+        self.__get_one().w = mx - ox
+        self.__get_one().h = my - oy
+        self.initrect = None
+
+
 class SelectMode(Mode):
     def __init__(self, state: State):
         self._state = state
@@ -76,10 +100,6 @@ class SelectMode(Mode):
         self._state.set_selection_box(pygame.Rect(0, 0, 0, 0))
 
 
-class ScaleMode(Mode):
-    pass
-
-
 class Selector(MouseListener):
     # TODO: node search is O(n), reduce to O(log(n))
 
@@ -89,8 +109,10 @@ class Selector(MouseListener):
         def get_checks():
             tm = TranslateMode(state)
             return [
-                (self.translate, tm),
-                (self.multitranslate, tm),
+                (self.check_scale, ScaleMode(state)),
+                (self.check_translate, tm),
+                (self.check_multitranslate, tm),  # TODO: multi move only when actual elements clicked
+
                 # pick this as the sane default - didn't mouse down on anything -> open selection box
                 (lambda _: True, SelectMode(state)),
             ]
@@ -101,25 +123,27 @@ class Selector(MouseListener):
         self.checks = get_checks()
         self._mode: Optional[Mode] = None
 
-    def translate(self, pos):
+    def check_scale(self, pos) -> bool:
+        bb = self._state.get_boundingbox()
+        if bb is None:
+            return False
+        for box in bb.get_size_boxes():
+            if box.get_rect().collidepoint(pos):
+                return True
+        return False
+
+    def check_translate(self, pos) -> bool:
         bb = self._state.get_boundingbox()
         # bb exists, immediately begin moving it
         return bb is not None and bb.get_rect().collidepoint(pos)
 
-    def multitranslate(self, pos):
+    def check_multitranslate(self, pos) -> bool:
         anysel = self._do_singleton_selection(pos)
         if anysel is not None:
             # moused down on something, select it and prepare for further transformations
             self._state.set_selected([anysel])
             return True
         return False
-
-    def _set_mode(self, pos):
-        # TODO: make it so you can only multi move when you click on the actual elements not just the bounding box
-        for (pred, mode) in self.checks:
-            if pred(pos):
-                self._mode = mode
-                return
 
     def mousedown(self, pos):
         super().mousedown(pos)
@@ -141,6 +165,13 @@ class Selector(MouseListener):
             return
         self._mode.mouseup(self._initpos, pos)
         self._invalidate()
+
+    def _set_mode(self, pos):
+        for (pred, mode) in self.checks:
+            if pred(pos):
+                self._mode = mode
+                print(self._mode)
+                return
 
     def _do_singleton_selection(self, pos) -> Optional[Component]:
         # TODO: singleton selection always takes the topmost element,
