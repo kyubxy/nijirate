@@ -11,6 +11,10 @@ from editor.model.state import State
 MINIMUM_ACTIONABLE_DISTANCE = 4
 
 
+def _dist(p1, p2):
+    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+
 def get_rect_from_pts(p1, p2):
     a, b = p1
     c, d = p2
@@ -23,63 +27,53 @@ def get_rect_from_pts(p1, p2):
 
 
 class Mode(ABC):
-    @abstractmethod
     def mousepressed(self, pos):
         pass
 
-    @abstractmethod
     def mousemotion(self, initpos, pos):
         pass
 
-    @abstractmethod
     def mouseup(self, initpos, pos):
         pass
 
 
 class TransformMode(Mode):
     def __init__(self, state: State):
-        self.state = state
-        self.initcompspos = []
+        self._state = state
+        self._initcompspos = []
 
     def mousepressed(self, pos):
-        self.initcompspos.clear()
-        for c in self.state.get_selected():
-            self.initcompspos.append((c.x, c.y))
+        self._initcompspos.clear()
+        for c in self._state.get_selected():
+            self._initcompspos.append((c.x, c.y))
 
     def mousemotion(self, initpos, pos):
-        for i, c in enumerate(self.state.get_selected()):
+        for i, c in enumerate(self._state.get_selected()):
             mx, my = pos
-            isx, isy = self.initcompspos[i]
+            isx, isy = self._initcompspos[i]
             ox, oy = (initpos[0] - isx, initpos[1] - isy)
             c.x = mx - ox
             c.y = my - oy
 
-    def mouseup(self, initpos, pos):
-        pass
-
 
 class SelectMode(Mode):
     def __init__(self, state: State):
-        self.state = state
-
-    def mousepressed(self, pos):
-        pass
+        self._state = state
 
     def mousemotion(self, initpos, pos):
         rect = get_rect_from_pts(initpos, pos)
-        self.state.set_selected_box(rect)
+        self._state.set_selected_box(rect)
 
     def mouseup(self, initpos, pos):
+        # NOTE: putting this in mousemotion allows for instant selection of
+        # components which might be considered better ux but at a slightly higher performance cost
+        # (which does scale in the number of available components)
         acc = []
-        for node in self.state.get_scenegraph():
+        for node in self._state.get_scenegraph():
             if get_component_rect(node).colliderect(get_rect_from_pts(initpos, pos)):
                 acc.append(node)
-        self.state.set_selected(acc)
-        self.state.set_selected_box(pygame.Rect(0, 0, 0, 0))
-
-
-def _dist(p1, p2):
-    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+        self._state.set_selected(acc)
+        self._state.set_selected_box(pygame.Rect(0, 0, 0, 0))
 
 
 class Selector(MouseListener):
@@ -87,59 +81,59 @@ class Selector(MouseListener):
 
     def __init__(self, state: State):
         super().__init__()
-        self.initpos = None
-        self.inmotion = False
-        self.pressed = False
-        self.state = state
-        self.sm = SelectMode(self.state)
-        self.tm = TransformMode(self.state)
-        self.mode: Optional[Mode] = None
+        self._initpos = None
+        self._inmotion = False
+        self._pressed = False
+        self._state = state
+        self._sm = SelectMode(self._state)
+        self._tm = TransformMode(self._state)
+        self._mode: Optional[Mode] = None
 
     def mousedown(self, pos):
         super().mousedown(pos)
-        self.pressed = True
-        self.initpos = pos
+        self._pressed = True
+        self._initpos = pos
         # never allow selecting multiple when already inside a component
         # NOTE: start with singleton selection immediately after mouse down
-        selected = self.do_singleton_selection(pos)
+        selected = self._do_singleton_selection(pos)
         if selected is None:
             # didn't mouse down on anything -> open selection box
-            self.mode = self.sm
+            self._mode = self._sm
         else:
             # moused down on something, select it and prepare for further transformations
-            self.state.set_selected([selected])
-            self.mode = self.tm
-        self.mode.mousepressed(pos)
+            self._state.set_selected([selected])
+            self._mode = self._tm
+        self._mode.mousepressed(pos)
 
     def mousemotion(self, pos):
-        if self.initpos is None:
+        if self._initpos is None:
             return
-        if self.pressed and _dist(self.initpos, pos) < MINIMUM_ACTIONABLE_DISTANCE and not self.inmotion:
+        if self._pressed and _dist(self._initpos, pos) < MINIMUM_ACTIONABLE_DISTANCE and not self._inmotion:
             return
         if self._is_invalidated():
             return
-        self.inmotion = True
-        self.mode.mousemotion(self.initpos, pos)
+        self._inmotion = True
+        self._mode.mousemotion(self._initpos, pos)
 
     def mouseup(self, pos) -> None:
-        self.pressed = False
-        self.inmotion = False
+        self._pressed = False
+        self._inmotion = False
         if self._is_invalidated():
             return
-        self.mode.mouseup(self.initpos, pos)
+        self._mode.mouseup(self._initpos, pos)
         self._invalidate()
 
-    def do_singleton_selection(self, pos) -> Optional[Component]:
+    def _do_singleton_selection(self, pos) -> Optional[Component]:
         # TODO: singleton selection always takes the topmost element,
         #  make it cycle elements on successive clicks
-        for node in self.state.get_scenegraph():
+        for node in self._state.get_scenegraph():
             if get_component_rect(node).collidepoint(pos):
                 return node
         return None
 
     def _is_invalidated(self):
-        return self.initpos is None and self._mode is None
+        return self._initpos is None and self._mode is None
 
     def _invalidate(self):
-        self.initpos = None
+        self._initpos = None
         self._mode = None

@@ -19,16 +19,13 @@ class Viewer(Base, StateObserver):
         self.state.attach_observer(self)
 
         self.crenderer = ComponentRenderer(self.screen)
-        self.bbrenderer = BoundingBoxRenderer(self.screen)
+        self.bbrenderer = BoundingBoxRenderer(self.screen, state)
         self.mousecontroller = MouseController(self.state)
 
         self.font = pygame.font.SysFont("Arial", 12)
 
     def onmessage(self, message: (str, List[any])):
-        msg, args = message
-
-        if msg == "selset":
-            self.bbrenderer.set_bound_components(args[0])
+        pass
 
     def update(self, events):
         self.mousecontroller.update(events)

@@ -56,15 +56,15 @@ def _minmax(components: List[Component]):
 
 
 class BoundingBoxRenderer:
-    def __init__(self, surface):
+    def __init__(self, surface, state):
         self.surface = surface
-        self.components = []
-        self.bbox = pygame.Rect(0, 0, 0, 0)
-
-    def set_bound_components(self, components: List[Component]):
-        self.components = components
-        (minx, miny), (maxx, maxy) = _minmax(components)
-        self.bbox = pygame.Rect(minx, miny, maxx - minx, maxy - miny)
+        self.state = state
 
     def draw_bounding_box(self):
-        pygame.draw.rect(self.surface, BOUNDING_OUTLINE_COLOUR, self.bbox, width=1)
+        # computing minmax on every frame is probably comparatively expensive
+        # but bounding boxes aren't necessarily drawn every frame and the complexity doesn't
+        # scale so i'll let it slide
+        # TODO: look into observing displacement and reformation of bounding box from state
+        (minx, miny), (maxx, maxy) = _minmax(self.state.get_selected())
+        bbox = pygame.Rect(minx, miny, maxx - minx, maxy - miny)
+        pygame.draw.rect(self.surface, BOUNDING_OUTLINE_COLOUR, bbox, width=1)
