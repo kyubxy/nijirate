@@ -1,2 +1,2 @@
-# Transcend rate
+# nijirate
 > Rating breakdown video generator

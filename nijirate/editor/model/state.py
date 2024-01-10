@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+import pygame
+
 from editor.model.component import Component
 
 
@@ -14,9 +16,10 @@ class State:
     def __init__(self):
         self.observers = []
 
-        self.do_wireframe = False               # wireframe view
-        self.scenegraph: List[Component] = []   # all items to be serialised -> does not include gizmos!
-        self.selected: List[Component] = []     # all currently selected items
+        self._do_wireframe = False  # wireframe view
+        self._scenegraph: List[Component] = []  # all items to be serialised -> does not include gizmos!
+        self._selected: List[Component] = []  # all currently selected items
+        self._selected_box: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
     # observers
 
@@ -33,17 +36,38 @@ class State:
     # wireframe - get set
 
     def set_wireframe(self, value):
-        self.do_wireframe = value
+        self._do_wireframe = value
         self.broadcast_message("wireframe", value)
 
     def get_wireframe(self):
-        return self.do_wireframe
+        return self._do_wireframe
 
     # scenegraph - get
 
     def get_scenegraph(self):
-        return self.scenegraph
+        return self._scenegraph
 
-    def set_scenegraph(self, sg):
-        self.scenegraph = sg
-        self.broadcast_message("sgadd", [sg])
+    def set_scenegraph(self, value):
+        self._scenegraph = value
+        self.broadcast_message("sgset", [value])
+
+    # selected - get set
+
+    def get_selected(self):
+        return self._selected
+
+    def set_selected(self, value):
+        self._selected = value
+        self.broadcast_message("selset", [value])
+        # NOTE: if setting becomes annoying we can revert to only exposing get and mutating
+
+    # selectedbox - get set
+
+    def get_selected_box(self):
+        return self._selected_box
+
+    def set_selected_box(self, value):
+        if value is None:
+            raise Exception("selected box cannot be None, use a"
+                            "rect with 0 area instead")
+        self._selected_box = value

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+import pygame
+
 
 class ComponentVisitor(ABC):
     @abstractmethod
@@ -44,3 +46,7 @@ class Sprite(Component):
 
     def accept(self, visitor: ComponentVisitor):
         visitor.visit_sprite(self)
+
+
+def get_component_rect(c: Component):
+    return pygame.Rect(c.x, c.y, c.w, c.h)
