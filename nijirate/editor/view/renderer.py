@@ -1,6 +1,8 @@
+from typing import List
+
 import pygame
 
-from editor.model.component import ComponentVisitor, Text, VideoHolder, Sprite
+from editor.model.component import ComponentVisitor, Text, VideoHolder, Sprite, Component, get_component_rect
 
 WIREFRAME_OUTLINE_COLOUR = (255, 255, 255)
 WIREFRAME_TEXT_COLOUR = (100, 100, 100)
@@ -8,6 +10,8 @@ WIREFRAME_TEXT_PADDING = 10
 
 SELECTION_COLOUR = (0, 100, 255)
 SELECTION_OPACITY = 128
+
+BOUNDING_OUTLINE_COLOUR = (0, 0, 255)
 
 
 class ComponentRenderer(ComponentVisitor):
@@ -32,12 +36,35 @@ class ComponentRenderer(ComponentVisitor):
         self.draw_wireframe(visitor, "video")
 
 
-class GizmoRenderer:
+def draw_selection_box(surface, rect):
+    surf = pygame.Surface((rect.w, rect.h))
+    surf.set_alpha(SELECTION_OPACITY)
+    surf.fill(SELECTION_COLOUR)
+    surface.blit(surf, (rect.x, rect.y))
+
+
+def _minmax(components: List[Component]):
+    minx, miny = (9000, 9000)  # TODO: do something better than this
+    maxx, maxy = (-1, -1)
+    for c in components:
+        rect = get_component_rect(c)
+        minx = min(minx, rect.left)
+        maxx = max(maxx, rect.right)
+        miny = min(miny, rect.top)
+        maxy = max(maxy, rect.bottom)
+    return (minx, miny), (maxx, maxy)
+
+
+class BoundingBoxRenderer:
     def __init__(self, surface):
         self.surface = surface
+        self.components = []
+        self.bbox = pygame.Rect(0, 0, 0, 0)
 
-    def draw_selection_box(self, rect):
-        surf = pygame.Surface((rect.w, rect.h))
-        surf.set_alpha(SELECTION_OPACITY)
-        surf.fill(SELECTION_COLOUR)
-        self.surface.blit(surf, (rect.x, rect.y))
+    def set_bound_components(self, components: List[Component]):
+        self.components = components
+        (minx, miny), (maxx, maxy) = _minmax(components)
+        self.bbox = pygame.Rect(minx, miny, maxx - minx, maxy - miny)
+
+    def draw_bounding_box(self):
+        pygame.draw.rect(self.surface, BOUNDING_OUTLINE_COLOUR, self.bbox, width=1)

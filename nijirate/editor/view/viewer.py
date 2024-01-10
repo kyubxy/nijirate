@@ -6,7 +6,7 @@ from editor.control.mousecontroller import MouseController
 from editor.model.component import VideoHolder
 from editor.model.state import State, StateObserver
 from editor.view.base import Base
-from editor.view.renderer import ComponentRenderer, GizmoRenderer
+from editor.view.renderer import ComponentRenderer, BoundingBoxRenderer, draw_selection_box
 
 
 class Viewer(Base, StateObserver):
@@ -16,29 +16,38 @@ class Viewer(Base, StateObserver):
         pygame.display.set_caption("Editor [DETACHED]" if detached else "Editor")
 
         self.state = state
+        self.state.attach_observer(self)
 
         self.crenderer = ComponentRenderer(self.screen)
-        self.grenderer = GizmoRenderer(self.screen)
+        self.bbrenderer = BoundingBoxRenderer(self.screen)
         self.mousecontroller = MouseController(self.state)
 
         self.font = pygame.font.SysFont("Arial", 12)
 
-    def onmessage(self, msg: (str, List[any])):
-        pass
+    def onmessage(self, message: (str, List[any])):
+        msg, args = message
+
+        if msg == "selset":
+            self.bbrenderer.set_bound_components(args[0])
 
     def update(self, events):
         self.mousecontroller.update(events)
 
+    def draw_gizmos(self):
+        sbox = self.state.get_selected_box()
+        if sbox.w * sbox.h > 0:
+            draw_selection_box(self.screen, sbox)
+        self.bbrenderer.draw_bounding_box()
+
+    def draw_scenegraph(self):
+        for c in self.state.get_scenegraph():
+            c.accept(self.crenderer)
+
     def draw(self):
         self.screen.fill((0, 0, 0))
 
-        # draw scenegraph
-        for c in self.state._scenegraph:
-            c.accept(self.crenderer)
-        # draw gizmos
-        sbox = self.state.get_selected_box()
-        if sbox.w * sbox.h > 0:
-            self.grenderer.draw_selection_box(sbox)
+        self.draw_scenegraph()
+        self.draw_gizmos()
 
         self.screen.blit(self.font.render("The editor is currently DETACHED. No communication is being made with "
                                           "other parts of the program", False, (255, 0, 0)), (0, 0))
