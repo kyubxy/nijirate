@@ -32,7 +32,7 @@ class Viewer(Base, StateObserver):
 
     def draw_gizmos(self):
         # we'll excuse the selection box from the gizmo ecosystem for the time being
-        sbox = self.state.get_selected_box()
+        sbox = self.state.get_selection_box()
         if sbox.w * sbox.h > 0:
             draw_selection_box(self.screen, sbox)
         bb = self.state.get_boundingbox()
@@ -62,10 +62,10 @@ if __name__ == "__main__":
     vh.w = 300
     vh.h = 200
     text = Text()
-    text.x = 200
-    text.y = 200
-    text.w = 200
-    text.h = 200
+    text.x = 500
+    text.y = 300
+    text.w = 40
+    text.h = 40
     s.get_scenegraph().append(vh)
     s.get_scenegraph().append(text)
     e = Viewer(s, True)

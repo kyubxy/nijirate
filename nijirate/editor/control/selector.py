@@ -1,5 +1,5 @@
 import math
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Optional
 
 import pygame.mouse
@@ -37,7 +37,7 @@ class Mode(ABC):
         pass
 
 
-class TransformMode(Mode):
+class TranslateMode(Mode):
     def __init__(self, state: State):
         self._state = state
         self._initcompspos = []
@@ -62,7 +62,7 @@ class SelectMode(Mode):
 
     def mousemotion(self, initpos, pos):
         rect = get_rect_from_pts(initpos, pos)
-        self._state.set_selected_box(rect)
+        self._state.set_selection_box(rect)
 
     def mouseup(self, initpos, pos):
         # NOTE: putting this in mousemotion allows for instant selection of
@@ -73,7 +73,11 @@ class SelectMode(Mode):
             if get_component_rect(node).colliderect(get_rect_from_pts(initpos, pos)):
                 acc.append(node)
         self._state.set_selected(acc)
-        self._state.set_selected_box(pygame.Rect(0, 0, 0, 0))
+        self._state.set_selection_box(pygame.Rect(0, 0, 0, 0))
+
+
+class ScaleMode(Mode):
+    pass
 
 
 class Selector(MouseListener):
@@ -81,29 +85,46 @@ class Selector(MouseListener):
 
     def __init__(self, state: State):
         super().__init__()
+
+        def get_checks():
+            tm = TranslateMode(state)
+            return [
+                (self.translate, tm),
+                (self.multitranslate, tm),
+                # pick this as the sane default - didn't mouse down on anything -> open selection box
+                (lambda _: True, SelectMode(state)),
+            ]
+
         self._initpos = None
         self._inmotion = False
         self._state = state
-        self._sm = SelectMode(self._state)
-        self._tm = TransformMode(self._state)
+        self.checks = get_checks()
         self._mode: Optional[Mode] = None
+
+    def translate(self, pos):
+        bb = self._state.get_boundingbox()
+        # bb exists, immediately begin moving it
+        return bb is not None and bb.get_rect().collidepoint(pos)
+
+    def multitranslate(self, pos):
+        anysel = self._do_singleton_selection(pos)
+        if anysel is not None:
+            # moused down on something, select it and prepare for further transformations
+            self._state.set_selected([anysel])
+            return True
+        return False
+
+    def _set_mode(self, pos):
+        # TODO: make it so you can only multi move when you click on the actual elements not just the bounding box
+        for (pred, mode) in self.checks:
+            if pred(pos):
+                self._mode = mode
+                return
 
     def mousedown(self, pos):
         super().mousedown(pos)
         self._initpos = pos
-        bb = self._state.get_boundingbox()
-        # TODO: make it so you can only multi move when you click on the actual elements not just the bounding box
-        anysel = self._do_singleton_selection(pos)
-        if bb is not None and bb.get_rect().collidepoint(pos):
-            # bb exists, immediately begin moving it
-            self._mode = self._tm
-        elif anysel is not None:
-            # moused down on something, select it and prepare for further transformations
-            self._state.set_selected([anysel])
-            self._mode = self._tm
-        else:  # self._do_singleton_selection(pos) is None:
-            # pick this as the sane default - didn't mouse down on anything -> open selection box
-            self._mode = self._sm
+        self._set_mode(pos)
         self._mode.mousepressed(pos)
 
     def mousemotion(self, pos):

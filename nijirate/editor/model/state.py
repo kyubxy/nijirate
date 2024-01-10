@@ -64,14 +64,14 @@ class State:
         self.broadcast_message("selset", [value])
         # NOTE: if setting becomes annoying we can revert to only exposing get and mutating
 
-    # selectedbox - get set
+    # selectionbox - get set
 
-    def get_selected_box(self):
+    def get_selection_box(self):
         return self._selection_box
 
-    def set_selected_box(self, value):
+    def set_selection_box(self, value):
         if value is None:
-            raise Exception("selected box cannot be None, use a"
+            raise Exception("selection box cannot be None, use a"
                             "rect with 0 area instead")
         self._selection_box = value
 

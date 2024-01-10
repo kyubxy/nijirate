@@ -13,6 +13,7 @@ SELECTION_COLOUR = (0, 100, 255)
 SELECTION_OPACITY = 128
 
 BOUNDING_OUTLINE_COLOUR = (0, 0, 255)
+BOUNDING_CHILD_COLOUR = (250, 250, 250)
 
 
 class ComponentRenderer(ComponentVisitor):
@@ -48,13 +49,14 @@ class GizmoRenderer(GizmoVisitor):
     def __init__(self, surface):
         self.surface = surface
 
-    def visit_scalebox(self, sc):
-        pass
-
     def visit_boundingbox(self, bb):
         # computing minmax on every frame is probably comparatively expensive
         # but bounding boxes aren't necessarily drawn every frame and the complexity doesn't
         # scale so i'll let it slide
         # TODO: look into observing displacement and reformation of bounding box from state
         pygame.draw.rect(self.surface, BOUNDING_OUTLINE_COLOUR, bb.get_rect(), width=1)
-
+        # TODO: multiscaling
+        if len(bb.get_selected()) > 1:
+            return
+        for sbox in bb.get_size_boxes():
+            pygame.draw.rect(self.surface, BOUNDING_CHILD_COLOUR, sbox.get_rect(), width=1)
