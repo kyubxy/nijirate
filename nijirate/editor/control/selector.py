@@ -1,6 +1,6 @@
 import math
-from enum import Enum
-from typing import Optional, List
+from abc import ABC, abstractmethod
+from typing import Optional
 
 import pygame.mouse
 
@@ -22,36 +22,64 @@ def get_rect_from_pts(p1, p2):
     return pygame.Rect(x1, y1, w, h)
 
 
-class TransformMode(MouseListener):
-
-    def mousedown(self, pos):
+class Mode(ABC):
+    @abstractmethod
+    def mousepressed(self, pos):
         pass
 
-    def mousemotion(self, pos):
+    @abstractmethod
+    def mousemotion(self, initpos, pos):
         pass
 
-    def mouseup(self, pos) -> None:
-        pass
-
-
-class SelectMode(MouseListener):
-
-    def mousemotion(self, pos):
-        pass
-
-    def mouseup(self, pos) -> None:
-        pass
-
-    def mousedown(self, pos):
+    @abstractmethod
+    def mouseup(self, initpos, pos):
         pass
 
 
-class SelectionMode(Enum):
-    """
-    What should happen when the user drags their cursor
-    """
-    TRANFORM = 0
-    SELECT = 1
+class TransformMode(Mode):
+    def __init__(self, state: State):
+        self.state = state
+        self.initcompspos = []
+
+    def mousepressed(self, pos):
+        self.initcompspos.clear()
+        for c in self.state.get_selected():
+            self.initcompspos.append((c.x, c.y))
+
+    def mousemotion(self, initpos, pos):
+        for i, c in enumerate(self.state.get_selected()):
+            mx, my = pos
+            isx, isy = self.initcompspos[i]
+            ox, oy = (initpos[0] - isx, initpos[1] - isy)
+            c.x = mx - ox
+            c.y = my - oy
+
+    def mouseup(self, initpos, pos):
+        pass
+
+
+class SelectMode(Mode):
+    def __init__(self, state: State):
+        self.state = state
+
+    def mousepressed(self, pos):
+        pass
+
+    def mousemotion(self, initpos, pos):
+        rect = get_rect_from_pts(initpos, pos)
+        self.state.set_selected_box(rect)
+
+    def mouseup(self, initpos, pos):
+        acc = []
+        for node in self.state.get_scenegraph():
+            if get_component_rect(node).colliderect(get_rect_from_pts(initpos, pos)):
+                acc.append(node)
+        self.state.set_selected(acc)
+        self.state.set_selected_box(pygame.Rect(0, 0, 0, 0))
+
+
+def _dist(p1, p2):
+    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
 
 class Selector(MouseListener):
@@ -59,75 +87,59 @@ class Selector(MouseListener):
 
     def __init__(self, state: State):
         super().__init__()
-        self.state = state
         self.initpos = None
-        self.nodeoffset = (0, 0)
-        self.mode: Optional[SelectionMode] = None
         self.inmotion = False
         self.pressed = False
+        self.state = state
+        self.sm = SelectMode(self.state)
+        self.tm = TransformMode(self.state)
+        self.mode: Optional[Mode] = None
 
     def mousedown(self, pos):
         super().mousedown(pos)
         self.pressed = True
-        # only mousedown can validate state
         self.initpos = pos
         # never allow selecting multiple when already inside a component
-        for node in self.state.get_scenegraph():
-            if get_component_rect(node).collidepoint(pos):
-                self.mode = SelectionMode.TRANFORM
-                self.nodeoffset = (pos[0] - node.x, pos[1] - node.y)
-                self.state.set_selected(self.do_singleton_selection(pos))
-            else:
-                self.mode = SelectionMode.SELECT
+        # NOTE: start with singleton selection immediately after mouse down
+        selected = self.do_singleton_selection(pos)
+        if selected is None:
+            # didn't mouse down on anything -> open selection box
+            self.mode = self.sm
+        else:
+            # moused down on something, select it and prepare for further transformations
+            self.state.set_selected([selected])
+            self.mode = self.tm
+        self.mode.mousepressed(pos)
 
     def mousemotion(self, pos):
         if self.initpos is None:
             return
-        if self.pressed and math.hypot(self.initpos[0] - pos[0], self.initpos[1] - pos[1]) < MINIMUM_ACTIONABLE_DISTANCE and not self.inmotion:
+        if self.pressed and _dist(self.initpos, pos) < MINIMUM_ACTIONABLE_DISTANCE and not self.inmotion:
             return
-        self.inmotion = True
         if self._is_invalidated():
             return
-        elif self.mode == SelectionMode.TRANFORM:
-            for c in self.state.get_selected():
-                mx, my = pos
-                ox, oy = self.nodeoffset
-                c.x = mx - ox
-                c.y = my - oy
-        elif self.mode == SelectionMode.SELECT:
-            rect = get_rect_from_pts(self.initpos, pos)
-            self.state.set_selected_box(rect)
+        self.inmotion = True
+        self.mode.mousemotion(self.initpos, pos)
 
     def mouseup(self, pos) -> None:
         self.pressed = False
         self.inmotion = False
         if self._is_invalidated():
-            return  # don't operate on invalidated states
-        elif self.mode == SelectionMode.TRANFORM:
-            pass
-        elif self.mode == SelectionMode.SELECT:
-            self.state.set_selected(self.do_multi_selection(get_rect_from_pts(self.initpos, pos)))
+            return
+        self.mode.mouseup(self.initpos, pos)
         self._invalidate()
-        self.state.set_selected_box(pygame.Rect(0, 0, 0, 0))
 
-    def do_singleton_selection(self, pos) -> List[Component]:
+    def do_singleton_selection(self, pos) -> Optional[Component]:
         # TODO: singleton selection always takes the topmost element,
         #  make it cycle elements on successive clicks
         for node in self.state.get_scenegraph():
             if get_component_rect(node).collidepoint(pos):
-                return [node]
-        return []
-
-    def do_multi_selection(self, rect) -> List[Component]:
-        acc = []
-        for node in self.state.get_scenegraph():
-            if get_component_rect(node).colliderect(rect):
-                acc.append(node)
-        return acc
+                return node
+        return None
 
     def _is_invalidated(self):
-        return self.initpos is None and self.mode is None
+        return self.initpos is None and self._mode is None
 
     def _invalidate(self):
         self.initpos = None
-        self.mode = None
+        self._mode = None
