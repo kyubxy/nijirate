@@ -83,7 +83,6 @@ class Selector(MouseListener):
         super().__init__()
         self._initpos = None
         self._inmotion = False
-        self._pressed = False
         self._state = state
         self._sm = SelectMode(self._state)
         self._tm = TransformMode(self._state)
@@ -91,32 +90,31 @@ class Selector(MouseListener):
 
     def mousedown(self, pos):
         super().mousedown(pos)
-        self._pressed = True
         self._initpos = pos
-        # never allow selecting multiple when already inside a component
-        # NOTE: start with singleton selection immediately after mouse down
-        selected = self._do_singleton_selection(pos)
-        if selected is None:
-            # didn't mouse down on anything -> open selection box
-            self._mode = self._sm
-        else:
-            # moused down on something, select it and prepare for further transformations
-            self._state.set_selected([selected])
+        bb = self._state.get_boundingbox()
+        # TODO: make it so you can only multi move when you click on the actual elements not just the bounding box
+        anysel = self._do_singleton_selection(pos)
+        if bb is not None and bb.get_rect().collidepoint(pos):
+            # bb exists, immediately begin moving it
             self._mode = self._tm
+        elif anysel is not None:
+            # moused down on something, select it and prepare for further transformations
+            self._state.set_selected([anysel])
+            self._mode = self._tm
+        else:  # self._do_singleton_selection(pos) is None:
+            # pick this as the sane default - didn't mouse down on anything -> open selection box
+            self._mode = self._sm
         self._mode.mousepressed(pos)
 
     def mousemotion(self, pos):
-        if self._initpos is None:
-            return
-        if self._pressed and _dist(self._initpos, pos) < MINIMUM_ACTIONABLE_DISTANCE and not self._inmotion:
-            return
         if self._is_invalidated():
+            return
+        if _dist(self._initpos, pos) < MINIMUM_ACTIONABLE_DISTANCE and not self._inmotion:
             return
         self._inmotion = True
         self._mode.mousemotion(self._initpos, pos)
 
     def mouseup(self, pos) -> None:
-        self._pressed = False
         self._inmotion = False
         if self._is_invalidated():
             return
@@ -126,7 +124,7 @@ class Selector(MouseListener):
     def _do_singleton_selection(self, pos) -> Optional[Component]:
         # TODO: singleton selection always takes the topmost element,
         #  make it cycle elements on successive clicks
-        for node in self._state.get_scenegraph():
+        for node in self._state.get_scenegraph()[::-1]:
             if get_component_rect(node).collidepoint(pos):
                 return node
         return None

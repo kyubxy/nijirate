@@ -3,6 +3,7 @@ from typing import List
 import pygame
 
 from editor.model.component import ComponentVisitor, Text, VideoHolder, Sprite, Component, get_component_rect
+from editor.model.gizmos import GizmoVisitor
 
 WIREFRAME_OUTLINE_COLOUR = (255, 255, 255)
 WIREFRAME_TEXT_COLOUR = (100, 100, 100)
@@ -43,28 +44,17 @@ def draw_selection_box(surface, rect):
     surface.blit(surf, (rect.x, rect.y))
 
 
-def _minmax(components: List[Component]):
-    minx, miny = (9000, 9000)  # TODO: do something better than this
-    maxx, maxy = (-1, -1)
-    for c in components:
-        rect = get_component_rect(c)
-        minx = min(minx, rect.left)
-        maxx = max(maxx, rect.right)
-        miny = min(miny, rect.top)
-        maxy = max(maxy, rect.bottom)
-    return (minx, miny), (maxx, maxy)
-
-
-class BoundingBoxRenderer:
-    def __init__(self, surface, state):
+class GizmoRenderer(GizmoVisitor):
+    def __init__(self, surface):
         self.surface = surface
-        self.state = state
 
-    def draw_bounding_box(self):
+    def visit_scalebox(self, sc):
+        pass
+
+    def visit_boundingbox(self, bb):
         # computing minmax on every frame is probably comparatively expensive
         # but bounding boxes aren't necessarily drawn every frame and the complexity doesn't
         # scale so i'll let it slide
         # TODO: look into observing displacement and reformation of bounding box from state
-        (minx, miny), (maxx, maxy) = _minmax(self.state.get_selected())
-        bbox = pygame.Rect(minx, miny, maxx - minx, maxy - miny)
-        pygame.draw.rect(self.surface, BOUNDING_OUTLINE_COLOUR, bbox, width=1)
+        pygame.draw.rect(self.surface, BOUNDING_OUTLINE_COLOUR, bb.get_rect(), width=1)
+

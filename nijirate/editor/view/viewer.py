@@ -3,10 +3,10 @@ from typing import List
 import pygame
 
 from editor.control.mousecontroller import MouseController
-from editor.model.component import VideoHolder
+from editor.model.component import VideoHolder, Text
 from editor.model.state import State, StateObserver
 from editor.view.base import Base
-from editor.view.renderer import ComponentRenderer, BoundingBoxRenderer, draw_selection_box
+from editor.view.renderer import ComponentRenderer, GizmoRenderer, draw_selection_box
 
 
 class Viewer(Base, StateObserver):
@@ -19,7 +19,7 @@ class Viewer(Base, StateObserver):
         self.state.attach_observer(self)
 
         self.crenderer = ComponentRenderer(self.screen)
-        self.bbrenderer = BoundingBoxRenderer(self.screen, state)
+        self.grenderer = GizmoRenderer(self.screen)
         self.mousecontroller = MouseController(self.state)
 
         self.font = pygame.font.SysFont("Arial", 12)
@@ -31,10 +31,13 @@ class Viewer(Base, StateObserver):
         self.mousecontroller.update(events)
 
     def draw_gizmos(self):
+        # we'll excuse the selection box from the gizmo ecosystem for the time being
         sbox = self.state.get_selected_box()
         if sbox.w * sbox.h > 0:
             draw_selection_box(self.screen, sbox)
-        self.bbrenderer.draw_bounding_box()
+        bb = self.state.get_boundingbox()
+        if bb is not None:
+            bb.accept(self.grenderer)
 
     def draw_scenegraph(self):
         for c in self.state.get_scenegraph():
@@ -58,6 +61,12 @@ if __name__ == "__main__":
     vh.y = 40
     vh.w = 300
     vh.h = 200
+    text = Text()
+    text.x = 200
+    text.y = 200
+    text.w = 200
+    text.h = 200
     s.get_scenegraph().append(vh)
+    s.get_scenegraph().append(text)
     e = Viewer(s, True)
     e.run()

@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 import pygame
 
 from editor.model.component import Component
+from editor.model.gizmos import GizmoElement, BoundingBox, get_bounding_box
 
 
 class StateObserver(ABC):
@@ -19,7 +20,8 @@ class State:
         self._do_wireframe = False  # wireframe view
         self._scenegraph: List[Component] = []  # all items to be serialised -> does not include gizmos!
         self._selected: List[Component] = []  # all currently selected items
-        self._selected_box: pygame.Rect = pygame.Rect(0, 0, 0, 0)
+        self._selection_box: pygame.Rect = pygame.Rect(0, 0, 0, 0)
+        self._boundingbox: Optional[BoundingBox] = None
 
     # observers
 
@@ -58,16 +60,22 @@ class State:
 
     def set_selected(self, value):
         self._selected = value
+        self._boundingbox = get_bounding_box(value)
         self.broadcast_message("selset", [value])
         # NOTE: if setting becomes annoying we can revert to only exposing get and mutating
 
     # selectedbox - get set
 
     def get_selected_box(self):
-        return self._selected_box
+        return self._selection_box
 
     def set_selected_box(self, value):
         if value is None:
             raise Exception("selected box cannot be None, use a"
                             "rect with 0 area instead")
-        self._selected_box = value
+        self._selection_box = value
+
+    # boundingbox - get
+
+    def get_boundingbox(self) -> Optional[BoundingBox]:
+        return self._boundingbox
