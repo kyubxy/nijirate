@@ -81,14 +81,17 @@ class ScaleBox:
         self.parent = parent
         self._corner = corner
 
+    def get_corner(self) -> Corner:
+        return self._corner
+
     def get_rect(self) -> pygame.Rect:
         (right, top) = self._corner.value
         cw, ch = BOUNDING_CORNER_SIZE, BOUNDING_CORNER_SIZE
-        if self.parent.get_rect().w > cw:
+        if self.parent.get_rect().w > cw*2:
             x = self.parent.get_rect().right - cw if right else self.parent.get_rect().left
         else:
             x = self.parent.get_rect().right if right else self.parent.get_rect().left - cw
-        if self.parent.get_rect().h > ch:
+        if self.parent.get_rect().h > ch*2:
             y = self.parent.get_rect().top if top else self.parent.get_rect().bottom - ch
         else:
             y = self.parent.get_rect().top - ch if top else self.parent.get_rect().bottom

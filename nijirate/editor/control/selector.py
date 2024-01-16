@@ -6,6 +6,7 @@ import pygame.mouse
 
 from editor.control.mouselistener import MouseListener
 from editor.model.component import get_component_rect, Component
+from editor.model.gizmos import BOUNDING_CORNER_SIZE, Corner
 from editor.model.state import State
 
 MINIMUM_ACTIONABLE_DISTANCE = 4
@@ -27,7 +28,7 @@ def get_rect_from_pts(p1, p2):
 
 
 class Mode(ABC):
-    def mousepressed(self, pos):
+    def mousepressed(self, pos, args):
         pass
 
     def mousemotion(self, initpos, pos):
@@ -42,7 +43,7 @@ class TranslateMode(Mode):
         self._state = state
         self._initcompspos = []
 
-    def mousepressed(self, pos):
+    def mousepressed(self, pos, args):
         self._initcompspos.clear()
         for c in self._state.get_selected():
             self._initcompspos.append((c.x, c.y))
@@ -56,28 +57,68 @@ class TranslateMode(Mode):
             c.y = my - oy
 
 
+def get_2pt_rect(pt1: (int, int), pt2: (int, int)) -> (int, int, int, int):
+    # this is such a dumb way of moving the variables but i dont care
+    pt1x, pt1y = pt1
+    pt2x, pt2y = pt2
+    pt1_ = min(pt1x, pt2x), min(pt1y, pt2y)
+    pt2_ = max(pt1x, pt2x), max(pt1y, pt2y)
+    pt1x, pt1y = pt1_
+    pt2x, pt2y = pt2_
+    return pt1x, pt1y, pt2x - pt1x, pt2y - pt1y
+
+
 class ScaleMode(Mode):
-    def __init__(self, state:State):
+    def __init__(self, state: State):
         self._state: State = state
-        self.initrect = None
+        self._initrect = None
+        self._corner = None
 
     # TODO: use the selected list directly when implementing multiscale
     def __get_one(self):
         return self._state.get_selected()[0]
 
-    def mousepressed(self, pos):
+    def mousepressed(self, pos, args):
         one = self.__get_one()
-        self.initrect = pygame.Rect(one.x, one.y, one.w, one.y)
+        self._corner = args
+        self._initrect = pygame.Rect(one.x, one.y, one.w, one.y)
+        print(self._initrect.x, self._initrect.y, self._initrect.w, self._initrect.h)
 
     def mousemotion(self, initpos, pos):
-        if self.initrect is None:
+        if self._initrect is None or self._corner is None:
             return  # malformed state - seeya later!
+        #pygame.mouse.set_visible(False)
         mx, my = pos
-        #ox, oy = (initpos[0] - self.initrect.right, initpos[1] - self.initrect.bottom)
-        ox, oy = self.initrect.right, self.initrect.bottom
-        self.__get_one().w = mx - ox
-        self.__get_one().h = my - oy
-        self.initrect = None
+        irect = self._initrect
+        fixedpt = None
+        if self._corner == Corner.BOTTOM_RIGHT:
+            fixedpt = (irect.left, irect.top)
+            fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
+        elif self._corner == Corner.BOTTOM_LEFT:
+            fixedpt = (irect.right, irect.top)
+            fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
+        elif self._corner == Corner.TOP_LEFT:
+            fixedpt = (irect.right, irect.bottom)
+            fx, fy, fw, fh = get_2pt_rect((mx, my), fixedpt)
+        elif self._corner == Corner.TOP_RIGHT:
+            fixedpt = (irect.left, irect.bottom)
+            fx, fy, fw, fh = get_2pt_rect((mx, my), fixedpt)
+
+        #fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
+        self.__get_one().x = fx
+        self.__get_one().y = fy
+        self.__get_one().w = fw
+        self.__get_one().h = fh
+
+    def mouseup(self, _, __):
+        #pygame.mouse.set_visible(True)
+        self._initrect = None
+        self._corner = None
+
+
+# TODO: rotation
+class RotateMode(Mode):
+    ...
 
 
 class SelectMode(Mode):
@@ -123,21 +164,21 @@ class Selector(MouseListener):
         self.checks = get_checks()
         self._mode: Optional[Mode] = None
 
-    def check_scale(self, pos) -> bool:
+    def check_scale(self, pos):
         bb = self._state.get_boundingbox()
         if bb is None:
             return False
         for box in bb.get_size_boxes():
             if box.get_rect().collidepoint(pos):
-                return True
+                return box.get_corner()
         return False
 
-    def check_translate(self, pos) -> bool:
+    def check_translate(self, pos):
         bb = self._state.get_boundingbox()
         # bb exists, immediately begin moving it
         return bb is not None and bb.get_rect().collidepoint(pos)
 
-    def check_multitranslate(self, pos) -> bool:
+    def check_multitranslate(self, pos):
         anysel = self._do_singleton_selection(pos)
         if anysel is not None:
             # moused down on something, select it and prepare for further transformations
@@ -148,8 +189,8 @@ class Selector(MouseListener):
     def mousedown(self, pos):
         super().mousedown(pos)
         self._initpos = pos
-        self._set_mode(pos)
-        self._mode.mousepressed(pos)
+        args = self._set_mode(pos)
+        self._mode.mousepressed(pos, args)
 
     def mousemotion(self, pos):
         if self._is_invalidated():
@@ -167,11 +208,13 @@ class Selector(MouseListener):
         self._invalidate()
 
     def _set_mode(self, pos):
+        # we are guarenteed that there will always be at least one mode to return
         for (pred, mode) in self.checks:
-            if pred(pos):
+            args = pred(pos)
+            if args:
                 self._mode = mode
                 print(self._mode)
-                return
+                return args
 
     def _do_singleton_selection(self, pos) -> Optional[Component]:
         # TODO: singleton selection always takes the topmost element,
