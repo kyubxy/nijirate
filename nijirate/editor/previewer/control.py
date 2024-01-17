@@ -10,12 +10,14 @@ from editor.state import State
 
 MINIMUM_ACTIONABLE_DISTANCE = 4
 
+# helpers
+
 
 def _dist(p1, p2):
     return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
 
-def get_rect_from_pts(p1, p2):
+def _get_rect_from_pts(p1, p2):
     a, b = p1
     c, d = p2
     x1 = min(a, c)
@@ -87,7 +89,7 @@ class ScaleMode(Mode):
             fixedpt = (irect.right, irect.bottom)
         elif self._corner == Corner.TOP_RIGHT:
             fixedpt = (irect.left, irect.bottom)
-        fx, fy, fw, fh = get_rect_from_pts(fixedpt, (mx, my))
+        fx, fy, fw, fh = _get_rect_from_pts(fixedpt, (mx, my))
         self.__get_one().x = fx
         self.__get_one().y = fy
         self.__get_one().w = fw
@@ -108,7 +110,7 @@ class SelectMode(Mode):
         self._state = state
 
     def mousemotion(self, initpos, pos):
-        rect = get_rect_from_pts(initpos, pos)
+        rect = _get_rect_from_pts(initpos, pos)
         self._state.set_selection_box(rect)
 
     def mouseup(self, initpos, pos):
@@ -117,7 +119,7 @@ class SelectMode(Mode):
         # (which does scale in the number of available components)
         acc = []
         for node in self._state.get_scenegraph():
-            if get_component_rect(node).colliderect(get_rect_from_pts(initpos, pos)):
+            if get_component_rect(node).colliderect(_get_rect_from_pts(initpos, pos)):
                 acc.append(node)
         self._state.set_selected(acc)
         self._state.set_selection_box(pygame.Rect(0, 0, 0, 0))
