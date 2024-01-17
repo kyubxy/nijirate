@@ -58,14 +58,16 @@ class TranslateMode(Mode):
 
 
 def get_2pt_rect(pt1: (int, int), pt2: (int, int)) -> (int, int, int, int):
-    # this is such a dumb way of moving the variables but i dont care
-    pt1x, pt1y = pt1
-    pt2x, pt2y = pt2
-    pt1_ = min(pt1x, pt2x), min(pt1y, pt2y)
-    pt2_ = max(pt1x, pt2x), max(pt1y, pt2y)
-    pt1x, pt1y = pt1_
-    pt2x, pt2y = pt2_
-    return pt1x, pt1y, pt2x - pt1x, pt2y - pt1y
+    x1, y1 = pt1
+    x2, y2 = pt2
+
+    # Calculate x, y, width, and height
+    x = min(x1, x2)
+    y = min(y1, y2)
+    width = abs(x1 - x2)
+    height = abs(y1 - y2)
+
+    return x, y, width, height
 
 
 class ScaleMode(Mode):
@@ -81,37 +83,31 @@ class ScaleMode(Mode):
     def mousepressed(self, pos, args):
         one = self.__get_one()
         self._corner = args
-        self._initrect = pygame.Rect(one.x, one.y, one.w, one.y)
-        print(self._initrect.x, self._initrect.y, self._initrect.w, self._initrect.h)
+        self._initrect = pygame.Rect(one.x, one.y, one.w, one.h)
 
     def mousemotion(self, initpos, pos):
+        # TODO: we aren't accounting for an offset so the corners will awkwardly snap to the cursor's position which
+        #  might be bad UX
         if self._initrect is None or self._corner is None:
             return  # malformed state - seeya later!
-        #pygame.mouse.set_visible(False)
         mx, my = pos
         irect = self._initrect
         fixedpt = None
         if self._corner == Corner.BOTTOM_RIGHT:
             fixedpt = (irect.left, irect.top)
-            fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
         elif self._corner == Corner.BOTTOM_LEFT:
             fixedpt = (irect.right, irect.top)
-            fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
         elif self._corner == Corner.TOP_LEFT:
             fixedpt = (irect.right, irect.bottom)
-            fx, fy, fw, fh = get_2pt_rect((mx, my), fixedpt)
         elif self._corner == Corner.TOP_RIGHT:
             fixedpt = (irect.left, irect.bottom)
-            fx, fy, fw, fh = get_2pt_rect((mx, my), fixedpt)
-
-        #fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
+        fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
         self.__get_one().x = fx
         self.__get_one().y = fy
         self.__get_one().w = fw
         self.__get_one().h = fh
 
     def mouseup(self, _, __):
-        #pygame.mouse.set_visible(True)
         self._initrect = None
         self._corner = None
 
@@ -142,8 +138,6 @@ class SelectMode(Mode):
 
 
 class Selector(MouseListener):
-    # TODO: node search is O(n), reduce to O(log(n))
-
     def __init__(self, state: State):
         super().__init__()
 
@@ -152,7 +146,7 @@ class Selector(MouseListener):
             return [
                 (self.check_scale, ScaleMode(state)),
                 (self.check_translate, tm),
-                (self.check_multitranslate, tm),  # TODO: multi move only when actual elements clicked
+                (self.check_multitranslate, tm),
 
                 # pick this as the sane default - didn't mouse down on anything -> open selection box
                 (lambda _: True, SelectMode(state)),
@@ -178,6 +172,7 @@ class Selector(MouseListener):
         # bb exists, immediately begin moving it
         return bb is not None and bb.get_rect().collidepoint(pos)
 
+    # TODO: multi move only when actual elements clicked
     def check_multitranslate(self, pos):
         anysel = self._do_singleton_selection(pos)
         if anysel is not None:
