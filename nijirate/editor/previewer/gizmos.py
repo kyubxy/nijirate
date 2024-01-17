@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import pygame
 
-from editor.model.component import Component, get_component_rect
+from editor.component import Component, get_component_rect
 
 BOUNDING_CORNER_SIZE = 40
 

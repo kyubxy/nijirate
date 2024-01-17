@@ -2,11 +2,11 @@ from typing import List
 
 import pygame
 
-from editor.control.mousecontroller import MouseController
-from editor.model.component import VideoHolder, Text
-from editor.model.state import State, StateObserver
-from editor.view.base import Base
-from editor.view.renderer import ComponentRenderer, GizmoRenderer, draw_selection_box
+from editor.component import VideoHolder, Text
+from editor.previewer.control import Selector
+from editor.state import State, StateObserver
+from editor.previewer.base import Base
+from editor.previewer.renderer import ComponentRenderer, GizmoRenderer, draw_selection_box
 
 
 class Viewer(Base, StateObserver):
@@ -20,7 +20,7 @@ class Viewer(Base, StateObserver):
 
         self.crenderer = ComponentRenderer(self.screen)
         self.grenderer = GizmoRenderer(self.screen)
-        self.mousecontroller = MouseController(self.state)
+        self.controller = Selector(self.state)
 
         self.font = pygame.font.SysFont("Arial", 12)
 
@@ -28,7 +28,14 @@ class Viewer(Base, StateObserver):
         pass
 
     def update(self, events):
-        self.mousecontroller.update(events)
+        for event in events:
+            pos = pygame.mouse.get_pos()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.controller.mousedown(pos)
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.controller.domouseup(pos)
+            if event.type == pygame.MOUSEMOTION:
+                self.controller.mousemotion(pos)
 
     def draw_gizmos(self):
         # we'll excuse the selection box from the gizmo ecosystem for the time being

@@ -3,8 +3,8 @@ from typing import List, Optional
 
 import pygame
 
-from editor.model.component import Component
-from editor.model.gizmos import GizmoElement, BoundingBox, get_bounding_box
+from editor.component import Component
+from editor.previewer.gizmos import BoundingBox, get_bounding_box
 
 
 class StateObserver(ABC):

@@ -1,9 +1,7 @@
-from typing import List
-
 import pygame
 
-from editor.model.component import ComponentVisitor, Text, VideoHolder, Sprite, Component, get_component_rect
-from editor.model.gizmos import GizmoVisitor
+from editor.component import ComponentVisitor, Text, VideoHolder, Sprite
+from editor.previewer.gizmos import GizmoVisitor
 
 WIREFRAME_OUTLINE_COLOUR = (255, 255, 255)
 WIREFRAME_TEXT_COLOUR = (100, 100, 100)

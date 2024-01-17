@@ -4,10 +4,10 @@ from typing import Optional
 
 import pygame.mouse
 
-from editor.control.mouselistener import MouseListener
-from editor.model.component import get_component_rect, Component
-from editor.model.gizmos import BOUNDING_CORNER_SIZE, Corner
-from editor.model.state import State
+from editor.previewer.mouselistener import MouseListener
+from editor.component import get_component_rect, Component
+from editor.previewer.gizmos import Corner
+from editor.state import State
 
 MINIMUM_ACTIONABLE_DISTANCE = 4
 
@@ -208,7 +208,7 @@ class Selector(MouseListener):
             args = pred(pos)
             if args:
                 self._mode = mode
-                print(self._mode)
+                # print(self._mode)
                 return args
 
     def _do_singleton_selection(self, pos) -> Optional[Component]:
