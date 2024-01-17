@@ -4,7 +4,6 @@ from typing import Optional
 
 import pygame.mouse
 
-from editor.previewer.mouselistener import MouseListener
 from editor.component import get_component_rect, Component
 from editor.previewer.gizmos import Corner
 from editor.state import State
@@ -124,9 +123,9 @@ class SelectMode(Mode):
         self._state.set_selection_box(pygame.Rect(0, 0, 0, 0))
 
 
-class Selector(MouseListener):
+class MouseSelector:
     def __init__(self, state: State):
-        super().__init__()
+        self._mouseprevpressed = False
 
         def get_checks():
             tm = TranslateMode(state)
@@ -169,7 +168,7 @@ class Selector(MouseListener):
         return False
 
     def mousedown(self, pos):
-        super().mousedown(pos)
+        self._mouseprevpressed = True
         self._initpos = pos
         args = self._set_mode(pos)
         self._mode.mousepressed(pos, args)
@@ -212,3 +211,10 @@ class Selector(MouseListener):
     def _invalidate(self):
         self._initpos = None
         self._mode = None
+
+    def domouseup(self, pos):
+        # only register mouse released events
+        # on listeners that previously registered mousedown
+        if self._mouseprevpressed:
+            self.mouseup(pos)
+        self._mouseprevpressed = False

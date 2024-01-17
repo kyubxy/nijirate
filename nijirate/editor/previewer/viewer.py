@@ -3,7 +3,7 @@ from typing import List
 import pygame
 
 from editor.component import VideoHolder, Text
-from editor.previewer.control import Selector
+from editor.previewer.control import MouseSelector
 from editor.state import State, StateObserver
 from editor.previewer.base import Base
 from editor.previewer.renderer import ComponentRenderer, GizmoRenderer, draw_selection_box
@@ -20,7 +20,7 @@ class Viewer(Base, StateObserver):
 
         self.crenderer = ComponentRenderer(self.screen)
         self.grenderer = GizmoRenderer(self.screen)
-        self.controller = Selector(self.state)
+        self.controller = MouseSelector(self.state)
 
         self.font = pygame.font.SysFont("Arial", 12)
 
