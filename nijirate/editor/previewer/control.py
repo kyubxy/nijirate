@@ -57,19 +57,6 @@ class TranslateMode(Mode):
             c.y = my - oy
 
 
-def get_2pt_rect(pt1: (int, int), pt2: (int, int)) -> (int, int, int, int):
-    x1, y1 = pt1
-    x2, y2 = pt2
-
-    # Calculate x, y, width, and height
-    x = min(x1, x2)
-    y = min(y1, y2)
-    width = abs(x1 - x2)
-    height = abs(y1 - y2)
-
-    return x, y, width, height
-
-
 class ScaleMode(Mode):
     def __init__(self, state: State):
         self._state: State = state
@@ -101,7 +88,7 @@ class ScaleMode(Mode):
             fixedpt = (irect.right, irect.bottom)
         elif self._corner == Corner.TOP_RIGHT:
             fixedpt = (irect.left, irect.bottom)
-        fx, fy, fw, fh = get_2pt_rect(fixedpt, (mx, my))
+        fx, fy, fw, fh = get_rect_from_pts(fixedpt, (mx, my))
         self.__get_one().x = fx
         self.__get_one().y = fy
         self.__get_one().w = fw
